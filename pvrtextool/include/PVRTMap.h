@@ -153,10 +153,10 @@ public:
 
 		//Copy the last key over the deleted key. There are now two copies of one element, 
 		//but the one at the end of the array is ignored.
-		m_Keys[uiIndex]=m_Keys[m_uiSize-1];
+		m_Keys[uiIndex] = m_Keys[m_uiSize]; m_Keys.RemoveLast();
 
 		//Copy the last data over the deleted data in the same way as the keys.
-		m_Data[uiIndex]=m_Data[m_uiSize-1];
+		m_Data[uiIndex] = m_Data[m_uiSize]; m_Data.RemoveLast();
 
 		//Return success.
 		return PVR_SUCCESS;
