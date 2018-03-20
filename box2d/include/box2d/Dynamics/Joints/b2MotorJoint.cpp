@@ -16,9 +16,9 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include <Box2D/Dynamics/Joints/b2MotorJoint.h>
-#include <Box2D/Dynamics/b2Body.h>
-#include <Box2D/Dynamics/b2TimeStep.h>
+#include "Box2D/Dynamics/Joints/b2MotorJoint.h"
+#include "Box2D/Dynamics/b2Body.h"
+#include "Box2D/Dynamics/b2TimeStep.h"
 
 // Point-to-point constraint
 // Cdot = v2 - v1
@@ -243,6 +243,17 @@ void b2MotorJoint::SetMaxTorque(float32 torque)
 float32 b2MotorJoint::GetMaxTorque() const
 {
 	return m_maxTorque;
+}
+
+void b2MotorJoint::SetCorrectionFactor(float32 factor)
+{
+	b2Assert(b2IsValid(factor) && 0.0f <= factor && factor <= 1.0f);
+	m_correctionFactor = factor;
+}
+
+float32 b2MotorJoint::GetCorrectionFactor() const
+{
+	return m_correctionFactor;
 }
 
 void b2MotorJoint::SetLinearOffset(const b2Vec2& linearOffset)

@@ -16,7 +16,7 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include <Box2D/Collision/Shapes/b2PolygonShape.h>
+#include "Box2D/Collision/Shapes/b2PolygonShape.h"
 #include <new>
 
 b2Shape* b2PolygonShape::Clone(b2BlockAllocator* allocator) const
@@ -128,11 +128,36 @@ void b2PolygonShape::Set(const b2Vec2* vertices, int32 count)
 	
 	int32 n = b2Min(count, b2_maxPolygonVertices);
 
-	// Copy vertices into local buffer
+	// Perform welding and copy vertices into local buffer.
 	b2Vec2 ps[b2_maxPolygonVertices];
+	int32 tempCount = 0;
 	for (int32 i = 0; i < n; ++i)
 	{
-		ps[i] = vertices[i];
+		b2Vec2 v = vertices[i];
+
+		bool unique = true;
+		for (int32 j = 0; j < tempCount; ++j)
+		{
+			if (b2DistanceSquared(v, ps[j]) < ((0.5f * b2_linearSlop) * (0.5f * b2_linearSlop)))
+			{
+				unique = false;
+				break;
+			}
+		}
+
+		if (unique)
+		{
+			ps[tempCount++] = v;
+		}
+	}
+
+	n = tempCount;
+	if (n < 3)
+	{
+		// Polygon is degenerate.
+		b2Assert(false);
+		SetAsBox(1.0f, 1.0f);
+		return;
 	}
 
 	// Create the convex hull using the Gift wrapping algorithm
@@ -141,7 +166,7 @@ void b2PolygonShape::Set(const b2Vec2* vertices, int32 count)
 	// Find the right most point on the hull
 	int32 i0 = 0;
 	float32 x0 = ps[0].x;
-	for (int32 i = 1; i < count; ++i)
+	for (int32 i = 1; i < n; ++i)
 	{
 		float32 x = ps[i].x;
 		if (x > x0 || (x == x0 && ps[i].y < ps[i0].y))
@@ -157,6 +182,7 @@ void b2PolygonShape::Set(const b2Vec2* vertices, int32 count)
 
 	for (;;)
 	{
+		b2Assert(m < b2_maxPolygonVertices);
 		hull[m] = ih;
 
 		int32 ie = 0;
@@ -192,6 +218,14 @@ void b2PolygonShape::Set(const b2Vec2* vertices, int32 count)
 		}
 	}
 	
+	if (m < 3)
+	{
+		// Polygon is degenerate.
+		b2Assert(false);
+		SetAsBox(1.0f, 1.0f);
+		return;
+	}
+
 	m_count = m;
 
 	// Copy vertices.
