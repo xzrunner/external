@@ -974,6 +974,6 @@ enum aiComponent
  * Property type: Bool. Default value: undefined.
  */
 
-#cmakedefine ASSIMP_DOUBLE_PRECISION 1
+//#cmakedefine ASSIMP_DOUBLE_PRECISION 1
 
 #endif // !! AI_CONFIG_H_INC
