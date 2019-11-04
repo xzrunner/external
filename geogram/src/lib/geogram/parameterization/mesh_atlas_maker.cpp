@@ -46,7 +46,7 @@
 #include <geogram/parameterization/mesh_atlas_maker.h>
 #include <geogram/parameterization/mesh_LSCM.h>
 #include <geogram/parameterization/mesh_ABF.h>
-#include <geogram/parameterization/mesh_segmentation.h>
+//#include <geogram/parameterization/mesh_segmentation.h>
 #include <geogram/parameterization/mesh_param_validator.h>
 #include <geogram/parameterization/mesh_param_packer.h>
 #include <geogram/points/principal_axes.h>
@@ -423,4 +423,28 @@ namespace GEO {
 	}
     }
     
+    void mesh_make_atlas_only_unwrap(
+        Mesh& mesh,
+        double hard_angles_threshold,
+        ChartParameterizer param,
+        bool verbose
+    ) {
+	    AtlasMaker atlas(mesh);
+	    atlas.set_hard_angles_threshold(hard_angles_threshold);
+	    atlas.set_chart_parameterizer(param);
+	    atlas.set_verbose(verbose);
+	    atlas.make_atlas();
+    }
+
+    void mesh_make_atlas_only_layout(
+        Mesh& mesh,
+        ChartPacker pack
+    ) {
+        Packer packer;
+        packer.pack_surface(mesh, false);
+        if (pack == PACK_XATLAS) {
+            pack_atlas_using_xatlas(mesh);
+        }
+    }
+
 }

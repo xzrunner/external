@@ -47,6 +47,7 @@
 #define GEOGRAM_MESH_MESH_ATLAS_MAKER
 
 #include <geogram/basic/common.h>
+#include <geogram/basic/numeric.h>
 
 /**
  * \file geogram/mesh/mesh_atlas_maker.h
@@ -70,6 +71,17 @@ namespace GEO {
 	ChartParameterizer param=PARAM_ABF,
 	ChartPacker pack=PACK_TETRIS,
 	bool verbose = false
+    );
+
+    void GEOGRAM_API mesh_make_atlas_only_unwrap(
+        Mesh& mesh,
+        double hard_angles_threshold = M_PI * 0.5,
+        ChartParameterizer param = PARAM_ABF,
+        bool verbose = false
+    );
+    void GEOGRAM_API mesh_make_atlas_only_layout(
+        Mesh& mesh,
+        ChartPacker pack = PACK_TETRIS
     );
 }
 
