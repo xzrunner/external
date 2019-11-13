@@ -25,6 +25,7 @@
 #include <boost/array.hpp>
 #endif
 #include <boost/cstdint.hpp>
+#include <boost/functional/hash_fwd.hpp>
 #include <boost/multiprecision/number.hpp>
 #include <boost/multiprecision/detail/big_lanczos.hpp>
 #include <boost/multiprecision/detail/dynamic_array.hpp>
@@ -33,6 +34,15 @@
 // Headers required for Boost.Math integration:
 //
 #include <boost/math/policies/policy.hpp>
+//
+// Some includes we need from Boost.Math, since we rely on that library to provide these functions:
+//
+#include <boost/math/special_functions/asinh.hpp>
+#include <boost/math/special_functions/acosh.hpp>
+#include <boost/math/special_functions/atanh.hpp>
+#include <boost/math/special_functions/cbrt.hpp>
+#include <boost/math/special_functions/expm1.hpp>
+#include <boost/math/special_functions/gamma.hpp>
 
 #ifdef BOOST_MSVC
 #pragma warning(push)
@@ -245,7 +255,11 @@ public:
    }
 
    template <class F>
-   cpp_dec_float(const F val, typename enable_if<is_floating_point<F> >::type* = 0) :
+   cpp_dec_float(const F val, typename enable_if_c<is_floating_point<F>::value
+#ifdef BOOST_HAS_FLOAT128
+      && !boost::is_same<F, __float128>::value
+#endif
+   >::type* = 0) :
       data(),
       exp (static_cast<ExponentType>(0)),
       neg (false),
@@ -256,6 +270,17 @@ public:
    }
 
    cpp_dec_float(const double mantissa, const ExponentType exponent);
+
+   std::size_t hash()const
+   {
+      std::size_t result = 0;
+      for(int i = 0; i < prec_elem; ++i)
+         boost::hash_combine(result, data[i]);
+      boost::hash_combine(result, exp);
+      boost::hash_combine(result, neg);
+      boost::hash_combine(result, fpclass);
+      return result;
+   }
 
    // Specific special values.
    static const cpp_dec_float& nan()
@@ -406,7 +431,7 @@ public:
    {
       if(v < 0)
       {
-         from_unsigned_long_long(-v);
+         from_unsigned_long_long(1u - boost::ulong_long_type(v + 1)); // Avoid undefined behaviour in negation of minimum value for long long
          negate();
       }
       else
@@ -583,11 +608,11 @@ public:
    void serialize(Archive & ar, const unsigned int /*version*/)
    {
       for(unsigned i = 0; i < data.size(); ++i)
-         ar & data[i];
-      ar & exp;
-      ar & neg;
-      ar & fpclass;
-      ar & prec_elem;
+         ar & boost::serialization::make_nvp("digit", data[i]);
+      ar & boost::serialization::make_nvp("exponent", exp);
+      ar & boost::serialization::make_nvp("sign", neg);
+      ar & boost::serialization::make_nvp("class-type", fpclass);
+      ar & boost::serialization::make_nvp("precision", prec_elem);
    }
 
 private:
@@ -948,6 +973,18 @@ cpp_dec_float<Digits10, ExponentType, Allocator>& cpp_dec_float<Digits10, Expone
 template <unsigned Digits10, class ExponentType, class Allocator>
 cpp_dec_float<Digits10, ExponentType, Allocator>& cpp_dec_float<Digits10, ExponentType, Allocator>::operator/=(const cpp_dec_float<Digits10, ExponentType, Allocator>& v)
 {
+   if(iszero())
+   {
+      if((v.isnan)())
+      {
+         return *this = v;
+      }
+      else if(v.iszero())
+      {
+         return *this = nan();
+      }
+   }
+
    const bool u_and_v_are_finite_and_identical = ( (isfinite)()
       && (fpclass == v.fpclass)
       && (exp == v.exp)
@@ -966,14 +1003,6 @@ cpp_dec_float<Digits10, ExponentType, Allocator>& cpp_dec_float<Digits10, Expone
    }
    else
    {
-      if(iszero())
-      {
-         if((v.isnan)() || v.iszero())
-         {
-            return *this = v;
-         }
-         return *this;
-      }
       cpp_dec_float t(v);
       t.calculate_inv();
       return operator*=(t);
@@ -1229,9 +1258,15 @@ cpp_dec_float<Digits10, ExponentType, Allocator>& cpp_dec_float<Digits10, Expone
 {
    // Compute the square root of *this.
 
+   if((isinf)() && !isneg())
+   {
+      return *this;
+   }
+
    if(isneg() || (!(isfinite)()))
    {
       *this = nan();
+      errno = EDOM;
       return *this;
    }
 
@@ -1273,7 +1308,7 @@ cpp_dec_float<Digits10, ExponentType, Allocator>& cpp_dec_float<Digits10, Expone
    // the run-time.
    //
    // Book references:
-   // http://www.jjj.de/pibook/pibook.html
+   // https://doi.org/10.1007/978-3-642-56735-3
    // http://www.amazon.com/exec/obidos/tg/detail/-/3540665722/qid=1035535482/sr=8-7/ref=sr_8_7/104-3357872-6059916?v=glance&n=507846
 
    static const boost::uint32_t double_digits10_minus_a_few = std::numeric_limits<double>::digits10 - 3;
@@ -1767,17 +1802,16 @@ std::string cpp_dec_float<Digits10, ExponentType, Allocator>::str(boost::intmax_
    // Extract the remaining digits from cpp_dec_float<Digits10, ExponentType, Allocator> after the decimal point.
    str = boost::lexical_cast<std::string>(data[0]);
 
+   std::stringstream ss;
    // Extract all of the digits from cpp_dec_float<Digits10, ExponentType, Allocator>, beginning with the first data element.
    for(std::size_t i = static_cast<std::size_t>(1u); i < number_of_elements; i++)
    {
-      std::stringstream ss;
-
       ss << std::setw(static_cast<std::streamsize>(cpp_dec_float_elem_digits10))
          << std::setfill(static_cast<char>('0'))
          << data[i];
 
-      str += ss.str();
    }
+   str += ss.str();
 
    bool have_leading_zeros = false;
 
@@ -2286,6 +2320,11 @@ void cpp_dec_float<Digits10, ExponentType, Allocator>::from_unsigned_long_long(c
    neg = false;
    fpclass = cpp_dec_float_finite;
    prec_elem = cpp_dec_float_elem_number;
+
+   if(u == 0)
+   {
+      return;
+   }
 
    std::size_t i =static_cast<std::size_t>(0u);
 
@@ -2797,6 +2836,8 @@ inline void eval_floor(cpp_dec_float<Digits10, ExponentType, Allocator>& result,
    result = x;
    if(!(x.isfinite)() || x.isint())
    {
+      if((x.isnan)())
+         errno = EDOM;
       return;
    }
 
@@ -2811,6 +2852,8 @@ inline void eval_ceil(cpp_dec_float<Digits10, ExponentType, Allocator>& result, 
    result = x;
    if(!(x.isfinite)() || x.isint())
    {
+      if((x.isnan)())
+         errno = EDOM;
       return;
    }
 
@@ -2822,14 +2865,11 @@ inline void eval_ceil(cpp_dec_float<Digits10, ExponentType, Allocator>& result, 
 template <unsigned Digits10, class ExponentType, class Allocator>
 inline void eval_trunc(cpp_dec_float<Digits10, ExponentType, Allocator>& result, const cpp_dec_float<Digits10, ExponentType, Allocator>& x)
 {
-   if(!(x.isfinite)())
-   {
-      result = boost::math::policies::raise_rounding_error("boost::multiprecision::trunc<%1%>(%1%)", 0, number<cpp_dec_float<Digits10, ExponentType, Allocator> >(x), number<cpp_dec_float<Digits10, ExponentType, Allocator> >(x), boost::math::policies::policy<>()).backend();
-      return;
-   }
-   else if(x.isint())
+   if(x.isint() || !(x.isfinite)())
    {
       result = x;
+      if((x.isnan)())
+         errno = EDOM;
       return;
    }
    result = x.extract_integer_part();
@@ -2838,6 +2878,16 @@ inline void eval_trunc(cpp_dec_float<Digits10, ExponentType, Allocator>& result,
 template <unsigned Digits10, class ExponentType, class Allocator>
 inline ExponentType eval_ilogb(const cpp_dec_float<Digits10, ExponentType, Allocator>& val)
 {
+   if(val.iszero())
+      return (std::numeric_limits<ExponentType>::min)();
+   if((val.isinf)())
+      return INT_MAX;
+   if((val.isnan)())
+#ifdef FP_ILOGBNAN
+      return FP_ILOGBNAN;
+#else
+      return INT_MAX;
+#endif
    // Set result, to the exponent of val:
    return val.order();
 }
@@ -2845,7 +2895,7 @@ template <unsigned Digits10, class ExponentType, class Allocator, class ArgType>
 inline void eval_scalbn(cpp_dec_float<Digits10, ExponentType, Allocator>& result, const cpp_dec_float<Digits10, ExponentType, Allocator>& val, ArgType e_)
 {
    using default_ops::eval_multiply;
-   const ExponentType e = e_;
+   const ExponentType e = static_cast<ExponentType>(e_);
    cpp_dec_float<Digits10, ExponentType, Allocator> t(1.0, e);
    eval_multiply(result, val, t);
 }
@@ -2872,14 +2922,15 @@ template <unsigned Digits10, class ExponentType, class Allocator>
 inline void eval_frexp(cpp_dec_float<Digits10, ExponentType, Allocator>& result, const cpp_dec_float<Digits10, ExponentType, Allocator>& x, ExponentType* e)
 {
    result = x;
-   if(result.isneg())
-      result.negate();
 
-   if(result.iszero())
+   if(result.iszero() || (result.isinf)() || (result.isnan)())
    {
       *e = 0;
       return;
    }
+
+   if(result.isneg())
+      result.negate();
 
    ExponentType t = result.order();
    BOOST_MP_USING_ABS
@@ -2955,6 +3006,12 @@ template <unsigned Digits10, class ExponentType, class Allocator>
 inline int eval_get_sign(const cpp_dec_float<Digits10, ExponentType, Allocator>& val)
 {
    return val.iszero() ? 0 : val.isneg() ? -1 : 1;
+}
+
+template <unsigned Digits10, class ExponentType, class Allocator>
+inline std::size_t hash_value(const cpp_dec_float<Digits10, ExponentType, Allocator>& val)
+{
+   return val.hash();
 }
 
 } // namespace backends

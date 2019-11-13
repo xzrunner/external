@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2013, 2014, 2015.
-// Modifications copyright (c) 2013-2015 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013, 2014, 2015, 2017, 2019.
+// Modifications copyright (c) 2013-2019 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -47,14 +47,30 @@ template
     typename GetTurnPolicy = detail::get_turns::get_turn_info_type
         <
             Geometry1, Geometry2, assign_policy<>
-        >,
-    typename RobustPolicy = detail::no_rescale_policy
+        >
 >
 struct get_turns
 {
     typedef typename geometry::point_type<Geometry1>::type point1_type;
 
-    typedef overlay::turn_info
+    template <typename Strategy>
+    struct robust_policy_type
+        : geometry::rescale_overlay_policy_type
+            <
+                Geometry1,
+                Geometry2,
+                typename Strategy::cs_tag
+            >
+    {};
+
+    template
+    <
+        typename Strategy,
+        typename RobustPolicy = typename robust_policy_type<Strategy>::type
+    >
+    struct turn_info_type
+    {
+        typedef overlay::turn_info
             <
                 point1_type,
                 typename segment_ratio_type<point1_type, RobustPolicy>::type,
@@ -66,7 +82,8 @@ struct get_turns
                                 point1_type, RobustPolicy
                             >::type
                     >::type
-            > turn_info;
+            > type;
+    };
 
     template <typename Turns>
     static inline void apply(Turns & turns,
@@ -75,28 +92,36 @@ struct get_turns
     {
         detail::get_turns::no_interrupt_policy interrupt_policy;
 
-        apply(turns, geometry1, geometry2, interrupt_policy);
-    }
-
-    template <typename Turns, typename InterruptPolicy>
-    static inline void apply(Turns & turns,
-                             Geometry1 const& geometry1,
-                             Geometry2 const& geometry2,
-                             InterruptPolicy & interrupt_policy)
-    {
-        RobustPolicy robust_policy = geometry::get_rescale_policy
+        typename strategy::intersection::services::default_strategy
             <
-                RobustPolicy
-            >(geometry1, geometry2);
+                typename cs_tag<Geometry1>::type
+            >::type intersection_strategy;
 
-        apply(turns, geometry1, geometry2, interrupt_policy, robust_policy);
+        apply(turns, geometry1, geometry2, interrupt_policy, intersection_strategy);
     }
 
-    template <typename Turns, typename InterruptPolicy>
+    template <typename Turns, typename InterruptPolicy, typename IntersectionStrategy>
     static inline void apply(Turns & turns,
                              Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              InterruptPolicy & interrupt_policy,
+                             IntersectionStrategy const& intersection_strategy)
+    {
+        typedef typename robust_policy_type<IntersectionStrategy>::type robust_policy_t;
+
+        robust_policy_t robust_policy
+                = geometry::get_rescale_policy<robust_policy_t>(
+                    geometry1, geometry2, intersection_strategy);
+
+        apply(turns, geometry1, geometry2, interrupt_policy, intersection_strategy, robust_policy);
+    }
+
+    template <typename Turns, typename InterruptPolicy, typename IntersectionStrategy, typename RobustPolicy>
+    static inline void apply(Turns & turns,
+                             Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             InterruptPolicy & interrupt_policy,
+                             IntersectionStrategy const& intersection_strategy,
                              RobustPolicy const& robust_policy)
     {
         static const bool reverse1 = detail::overlay::do_reverse
@@ -119,7 +144,8 @@ struct get_turns
                 reverse2,
                 GetTurnPolicy
             >::apply(0, geometry1, 1, geometry2,
-                     robust_policy, turns, interrupt_policy);
+                     intersection_strategy, robust_policy,
+                     turns, interrupt_policy);
     }
 };
 

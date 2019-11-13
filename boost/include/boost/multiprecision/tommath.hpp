@@ -12,7 +12,9 @@
 #include <boost/math/special_functions/fpclassify.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/scoped_array.hpp>
+#include <boost/functional/hash_fwd.hpp>
 #include <tommath.h>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <climits>
@@ -310,10 +312,13 @@ struct tommath_int
       boost::scoped_array<char> a(new char[s+1]);
       detail::check_tommath_result(mp_toradix_n(const_cast< ::mp_int*>(&m_data), a.get(), base, s+1));
       std::string result = a.get();
+      if (f & std::ios_base::uppercase)
+          for (size_t i = 0; i < result.length(); ++i)
+              result[i] = std::toupper(result[i]);
       if((base != 10) && (f & std::ios_base::showbase))
       {
          int pos = result[0] == '-' ? 1 : 0;
-         const char* pp = base == 8 ? "0" : "0x";
+         const char* pp = base == 8 ? "0" : (f & std::ios_base::uppercase) ? "0X" : "0x";
          result.insert(static_cast<std::string::size_type>(pos), pp);
       }
       if((f & std::ios_base::showpos) && (result[0] != '-'))
@@ -557,6 +562,7 @@ inline int eval_get_sign(const tommath_int& val)
 {
    return mp_iszero(&val.data()) ? 0 : SIGN(&val.data()) ? -1 : 1;
 }
+/*
 template <class A>
 inline void eval_convert_to(A* result, const tommath_int& val)
 {
@@ -574,6 +580,7 @@ inline void eval_convert_to(signed char* result, const tommath_int& val)
 {
    *result = static_cast<signed char>(boost::lexical_cast<int>(val.str(0, std::ios_base::fmtflags(0))));
 }
+*/
 inline void eval_abs(tommath_int& result, const tommath_int& val)
 {
    detail::check_tommath_result(mp_abs(const_cast< ::mp_int*>(&val.data()), &result.data()));
@@ -649,6 +656,16 @@ template <class Integer>
 inline typename enable_if<is_signed<Integer>, Integer>::type eval_integer_modulus(const tommath_int& x, Integer val)
 {
    return eval_integer_modulus(x, boost::multiprecision::detail::unsigned_abs(val));
+}
+
+inline std::size_t hash_value(const tommath_int& val)
+{
+   std::size_t result = 0;
+   std::size_t len = val.data().used;
+   for(std::size_t i = 0; i < len; ++i)
+      boost::hash_combine(result, val.data().dp[i]);
+   boost::hash_combine(result, val.data().sign);
+   return result;
 }
 
 } // namespace backends

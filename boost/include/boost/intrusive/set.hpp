@@ -28,6 +28,11 @@
 namespace boost {
 namespace intrusive {
 
+#if !defined(BOOST_INTRUSIVE_DOXYGEN_INVOKED)
+template<class ValueTraits, class VoidOrKeyOfValue, class Compare, class SizeType, bool ConstantTimeSize, typename HeaderHolder>
+class multiset_impl;
+#endif
+
 //! The class template set is an intrusive container, that mimics most of
 //! the interface of std::set as described in the C++ standard.
 //!
@@ -149,6 +154,15 @@ class set_impl
 
    //! @copydoc ::boost::intrusive::rbtree::crend()const
    const_reverse_iterator crend() const;
+
+   //! @copydoc ::boost::intrusive::rbtree::root()
+   iterator root();
+
+   //! @copydoc ::boost::intrusive::rbtree::root()const
+   const_iterator root() const;
+
+   //! @copydoc ::boost::intrusive::rbtree::croot()const
+   const_iterator croot() const;
 
    //! @copydoc ::boost::intrusive::rbtree::container_from_end_iterator(iterator)
    static set_impl &container_from_end_iterator(iterator end_iterator);
@@ -399,6 +413,26 @@ class set_impl
 
    //! @copydoc ::boost::intrusive::rbtree::remove_node
    void remove_node(reference value);
+
+   //! @copydoc ::boost::intrusive::rbtree::merge_unique
+   template<class ...Options2>
+   void merge(set<T, Options2...> &source);
+
+   //! @copydoc ::boost::intrusive::rbtree::merge_unique
+   template<class ...Options2>
+   void merge(multiset<T, Options2...> &source);
+
+   #else
+
+   template<class Compare2>
+   void merge(set_impl<ValueTraits, VoidOrKeyOfValue, Compare2, SizeType, ConstantTimeSize, HeaderHolder> &source)
+   {  return tree_type::merge_unique(source);  }
+
+
+   template<class Compare2>
+   void merge(multiset_impl<ValueTraits, VoidOrKeyOfValue, Compare2, SizeType, ConstantTimeSize, HeaderHolder> &source)
+   {  return tree_type::merge_unique(source);  }
+
    #endif   //#ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 };
 
@@ -491,46 +525,46 @@ class set
    //Assert if passed value traits are compatible with the type
    BOOST_STATIC_ASSERT((detail::is_same<typename value_traits::value_type, T>::value));
 
-   set()
+   BOOST_INTRUSIVE_FORCEINLINE set()
       :  Base()
    {}
 
-   explicit set( const key_compare &cmp, const value_traits &v_traits = value_traits())
+   BOOST_INTRUSIVE_FORCEINLINE explicit set( const key_compare &cmp, const value_traits &v_traits = value_traits())
       :  Base(cmp, v_traits)
    {}
 
    template<class Iterator>
-   set( Iterator b, Iterator e
+   BOOST_INTRUSIVE_FORCEINLINE set( Iterator b, Iterator e
       , const key_compare &cmp = key_compare()
       , const value_traits &v_traits = value_traits())
       :  Base(b, e, cmp, v_traits)
    {}
 
-   set(BOOST_RV_REF(set) x)
+   BOOST_INTRUSIVE_FORCEINLINE set(BOOST_RV_REF(set) x)
       :  Base(BOOST_MOVE_BASE(Base, x))
    {}
 
-   set& operator=(BOOST_RV_REF(set) x)
+   BOOST_INTRUSIVE_FORCEINLINE set& operator=(BOOST_RV_REF(set) x)
    {  return static_cast<set &>(this->Base::operator=(BOOST_MOVE_BASE(Base, x)));  }
 
    template <class Cloner, class Disposer>
-   void clone_from(const set &src, Cloner cloner, Disposer disposer)
+   BOOST_INTRUSIVE_FORCEINLINE void clone_from(const set &src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(src, cloner, disposer);  }
 
    template <class Cloner, class Disposer>
-   void clone_from(BOOST_RV_REF(set) src, Cloner cloner, Disposer disposer)
+   BOOST_INTRUSIVE_FORCEINLINE void clone_from(BOOST_RV_REF(set) src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(BOOST_MOVE_BASE(Base, src), cloner, disposer);  }
 
-   static set &container_from_end_iterator(iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static set &container_from_end_iterator(iterator end_iterator)
    {  return static_cast<set &>(Base::container_from_end_iterator(end_iterator));   }
 
-   static const set &container_from_end_iterator(const_iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static const set &container_from_end_iterator(const_iterator end_iterator)
    {  return static_cast<const set &>(Base::container_from_end_iterator(end_iterator));   }
 
-   static set &container_from_iterator(iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static set &container_from_iterator(iterator it)
    {  return static_cast<set &>(Base::container_from_iterator(it));   }
 
-   static const set &container_from_iterator(const_iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static const set &container_from_iterator(const_iterator it)
    {  return static_cast<const set &>(Base::container_from_iterator(it));   }
 };
 
@@ -657,6 +691,15 @@ class multiset_impl
 
    //! @copydoc ::boost::intrusive::rbtree::crend()const
    const_reverse_iterator crend() const;
+
+   //! @copydoc ::boost::intrusive::rbtree::root()
+   iterator root();
+
+   //! @copydoc ::boost::intrusive::rbtree::root()const
+   const_iterator root() const;
+
+   //! @copydoc ::boost::intrusive::rbtree::croot()const
+   const_iterator croot() const;
 
    //! @copydoc ::boost::intrusive::rbtree::container_from_end_iterator(iterator)
    static multiset_impl &container_from_end_iterator(iterator end_iterator);
@@ -865,6 +908,25 @@ class multiset_impl
 
    //! @copydoc ::boost::intrusive::rbtree::remove_node
    void remove_node(reference value);
+
+   //! @copydoc ::boost::intrusive::rbtree::merge_equal
+   template<class ...Options2>
+   void merge(multiset<T, Options2...> &source);
+
+   //! @copydoc ::boost::intrusive::rbtree::merge_equal
+   template<class ...Options2>
+   void merge(set<T, Options2...> &source);
+
+   #else
+
+   template<class Compare2>
+   void merge(multiset_impl<ValueTraits, VoidOrKeyOfValue, Compare2, SizeType, ConstantTimeSize, HeaderHolder> &source)
+   {  return tree_type::merge_equal(source);  }
+
+   template<class Compare2>
+   void merge(set_impl<ValueTraits, VoidOrKeyOfValue, Compare2, SizeType, ConstantTimeSize, HeaderHolder> &source)
+   {  return tree_type::merge_equal(source);  }
+
    #endif   //#ifdef BOOST_INTRUSIVE_DOXYGEN_INVOKED
 };
 
@@ -958,46 +1020,46 @@ class multiset
    //Assert if passed value traits are compatible with the type
    BOOST_STATIC_ASSERT((detail::is_same<typename value_traits::value_type, T>::value));
 
-   multiset()
+   BOOST_INTRUSIVE_FORCEINLINE multiset()
       :  Base()
    {}
 
-   explicit multiset( const key_compare &cmp, const value_traits &v_traits = value_traits())
+   BOOST_INTRUSIVE_FORCEINLINE explicit multiset( const key_compare &cmp, const value_traits &v_traits = value_traits())
       :  Base(cmp, v_traits)
    {}
 
    template<class Iterator>
-   multiset( Iterator b, Iterator e
+   BOOST_INTRUSIVE_FORCEINLINE multiset( Iterator b, Iterator e
            , const key_compare &cmp = key_compare()
            , const value_traits &v_traits = value_traits())
       :  Base(b, e, cmp, v_traits)
    {}
 
-   multiset(BOOST_RV_REF(multiset) x)
+   BOOST_INTRUSIVE_FORCEINLINE multiset(BOOST_RV_REF(multiset) x)
       :  Base(BOOST_MOVE_BASE(Base, x))
    {}
 
-   multiset& operator=(BOOST_RV_REF(multiset) x)
+   BOOST_INTRUSIVE_FORCEINLINE multiset& operator=(BOOST_RV_REF(multiset) x)
    {  return static_cast<multiset &>(this->Base::operator=(BOOST_MOVE_BASE(Base, x)));  }
 
    template <class Cloner, class Disposer>
-   void clone_from(const multiset &src, Cloner cloner, Disposer disposer)
+   BOOST_INTRUSIVE_FORCEINLINE void clone_from(const multiset &src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(src, cloner, disposer);  }
 
    template <class Cloner, class Disposer>
-   void clone_from(BOOST_RV_REF(multiset) src, Cloner cloner, Disposer disposer)
+   BOOST_INTRUSIVE_FORCEINLINE void clone_from(BOOST_RV_REF(multiset) src, Cloner cloner, Disposer disposer)
    {  Base::clone_from(BOOST_MOVE_BASE(Base, src), cloner, disposer);  }
 
-   static multiset &container_from_end_iterator(iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static multiset &container_from_end_iterator(iterator end_iterator)
    {  return static_cast<multiset &>(Base::container_from_end_iterator(end_iterator));   }
 
-   static const multiset &container_from_end_iterator(const_iterator end_iterator)
+   BOOST_INTRUSIVE_FORCEINLINE static const multiset &container_from_end_iterator(const_iterator end_iterator)
    {  return static_cast<const multiset &>(Base::container_from_end_iterator(end_iterator));   }
 
-   static multiset &container_from_iterator(iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static multiset &container_from_iterator(iterator it)
    {  return static_cast<multiset &>(Base::container_from_iterator(it));   }
 
-   static const multiset &container_from_iterator(const_iterator it)
+   BOOST_INTRUSIVE_FORCEINLINE static const multiset &container_from_iterator(const_iterator it)
    {  return static_cast<const multiset &>(Base::container_from_iterator(it));   }
 };
 
